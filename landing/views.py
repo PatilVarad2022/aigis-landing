@@ -128,6 +128,7 @@ def signup(request):
         if request.method == "POST":
             form = SignupForm(request.POST)
             if form.is_valid():
+                user = None
                 try:
                     with transaction.atomic():
                         email = form.cleaned_data["email"].lower()
@@ -153,7 +154,12 @@ def signup(request):
                         # Re-raise other database errors to be caught by outer exception handler
                         raise
 
-                # Send welcome email to user (HTML formatted)
+                # If user creation failed, don't proceed
+                if not user:
+                    form.add_error(None, 'Failed to create account. Please try again.')
+                    return render(request, "landing/signup.html", {"form": form})
+
+                # Send welcome email to user (HTML formatted) - non-blocking
                 try:
                     html_content = f'''
 <!DOCTYPE html>
@@ -380,13 +386,13 @@ P.S. Remember: Your trial is completely free, no credit card required. If you lo
                         to=[email],
                     )
                     msg.attach_alternative(html_content, "text/html")
-                    msg.send(fail_silently=False)
+                    msg.send(fail_silently=True)  # Changed to fail_silently=True to prevent blocking
                     print(f"[AIGIS] ✓ Welcome email sent successfully to {email}")
                 except Exception as e:
                     print(f"[AIGIS] ✗ Failed to send welcome email to {email}: {e}")
                     import traceback
                     print(f"[AIGIS] Error details: {traceback.format_exc()}")
-                    # Still continue even if email fails
+                    # Still continue even if email fails - don't block signup
 
                 # Send notification email to admin
                 admin_email = getattr(settings, 'ADMIN_EMAIL', None)
@@ -405,7 +411,7 @@ Signup Date: {user.date_joined.strftime("%Y-%m-%d %H:%M:%S")}
 Total users: {User.objects.count()}''',
                         from_email=settings.DEFAULT_FROM_EMAIL,
                         recipient_list=[admin_email],
-                        fail_silently=False,
+                        fail_silently=True,  # Changed to fail_silently=True to prevent blocking
                         )
                         print(f"[AIGIS] ✓ Admin notification sent successfully to {admin_email}")
                     except Exception as e:
