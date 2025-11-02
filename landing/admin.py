@@ -277,6 +277,9 @@ class UserProfileAdmin(admin.ModelAdmin):
         for profile in queryset:
             user = profile.user
             user_id = user.id
+            # Skip superusers
+            if user.is_superuser:
+                continue
             if user_id not in users_deleted:
                 user.delete()  # This will cascade delete the profile
                 users_deleted.add(user_id)
