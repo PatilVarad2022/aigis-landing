@@ -16,8 +16,10 @@ class UserProfileInline(admin.StackedInline):
         return False
 
 
+# Unregister the default User admin and register our custom one
+admin.site.unregister(User)
+
 # Custom User Admin with UserProfile inline
-@admin.register(User)
 class CustomUserAdmin(BaseUserAdmin):
     list_display = ('username', 'email', 'full_name', 'phone', 'shield_percent', 'date_joined', 'is_staff', 'is_active')
     list_filter = ('is_staff', 'is_superuser', 'is_active', 'date_joined')
@@ -61,6 +63,10 @@ class CustomUserAdmin(BaseUserAdmin):
         return '-'
     shield_percent.short_description = 'Loss Shield'
     shield_percent.admin_order_field = 'profile__shield_limit_percent'
+
+
+# Register the custom User admin
+admin.site.register(User, CustomUserAdmin)
 
 
 # UserProfile Admin with full CRUD capabilities
