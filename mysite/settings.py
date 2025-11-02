@@ -78,11 +78,14 @@ WSGI_APPLICATION = 'mysite.wsgi.application'
 
 # Use PostgreSQL if DATABASE_URL is set (production), otherwise use SQLite (local)
 if os.environ.get('DATABASE_URL'):
+    db_config = dj_database_url.config(
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600
+    )
+    # Ensure we use PostgreSQL backend (works with both psycopg2 and psycopg3)
+    db_config['ENGINE'] = 'django.db.backends.postgresql'
     DATABASES = {
-        'default': dj_database_url.config(
-            default=os.environ.get('DATABASE_URL'),
-            conn_max_age=600
-        )
+        'default': db_config
     }
 else:
     DATABASES = {
