@@ -378,12 +378,51 @@ Welcome aboard!
 
 P.S. Remember: Your trial is completely free, no credit card required. If you love it after 28 days, it's just ₹149/month. If not, export your data and walk away—no questions asked.'''
 
-                # Emails disabled during signup to prevent 502 errors
-                # Emails can be sent later via scheduled job or management command
-                # This ensures signup completes immediately without timeouts
-                print(f"[AIGIS] User {email} signed up successfully. Emails will be sent later.")
+                # Queue emails for later sending (prevents 502 errors)
+                # Emails will be sent automatically by scheduled job in a few minutes
+                from landing.models import PendingEmail
+                from django.utils import timezone
                 
-                messages.success(request, "Your 28-day trial is active! Welcome to Aigis.")
+                try:
+                    # Queue welcome email
+                    PendingEmail.objects.create(
+                        user=user,
+                        email_type='welcome',
+                        email_data={
+                            'to': email,
+                            'subject': 'Welcome to Aigis! 🛡️ Your AI Trading Partner is Ready',
+                            'html_content': html_content,
+                            'text_content': text_content,
+                            'full_name': full_name,
+                            'shield': shield,
+                        }
+                    )
+                    print(f"[AIGIS] Queued welcome email for {email}")
+                    
+                    # Queue admin notification
+                    admin_email = getattr(settings, 'ADMIN_EMAIL', None)
+                    if admin_email:
+                        PendingEmail.objects.create(
+                            user=user,
+                            email_type='admin_notification',
+                            email_data={
+                                'to': admin_email,
+                                'subject': f'New Aigis Signup: {full_name}',
+                                'message': f'''New user signed up:
+
+Name: {full_name}
+Email: {email}
+Phone: {phone or "Not provided"}
+Loss Shield: {shield}%
+Signup Date: {user.date_joined.strftime("%Y-%m-%d %H:%M:%S")}''',
+                            }
+                        )
+                        print(f"[AIGIS] Queued admin notification for {admin_email}")
+                except Exception as e:
+                    print(f"[AIGIS] ⚠ Failed to queue emails (non-critical): {e}")
+                    # Don't block signup if email queuing fails
+                
+                messages.success(request, "Your 28-day trial is active! Check your email in a few minutes.")
                 return redirect("signup_success")
             else:
                 # Form is invalid, render with errors
