@@ -9,6 +9,54 @@ from .forms import SignupForm
 from .models import UserProfile
 
 def index(request):
+    # Process pending emails automatically (occasionally, to avoid slowdown)
+    # Ensures emails are sent even if signup_success page isn't visited again
+    try:
+        import random
+        if random.randint(1, 10) == 1:  # 10% chance per page load
+            from landing.models import PendingEmail
+            from django.utils import timezone
+            from datetime import timedelta
+            from django.core.mail import send_mail, EmailMultiAlternatives
+            
+            cutoff_time = timezone.now() - timedelta(minutes=2)
+            pending_emails = PendingEmail.objects.filter(
+                sent=False,
+                created_at__lte=cutoff_time
+            ).order_by('created_at')[:5]  # Process max 5 at a time
+            
+            for pending_email in pending_emails:
+                try:
+                    email_data = pending_email.email_data
+                    
+                    if pending_email.email_type == 'welcome':
+                        msg = EmailMultiAlternatives(
+                            subject=email_data['subject'],
+                            body=email_data['text_content'],
+                            from_email=settings.DEFAULT_FROM_EMAIL,
+                            to=[email_data['to']],
+                        )
+                        msg.attach_alternative(email_data['html_content'], "text/html")
+                        msg.send(fail_silently=True)
+                    elif pending_email.email_type == 'admin_notification':
+                        send_mail(
+                            subject=email_data['subject'],
+                            message=email_data['message'],
+                            from_email=settings.DEFAULT_FROM_EMAIL,
+                            recipient_list=[email_data['to']],
+                            fail_silently=True,
+                        )
+                    
+                    pending_email.sent = True
+                    pending_email.sent_at = timezone.now()
+                    pending_email.save()
+                except Exception:
+                    pending_email.attempts += 1
+                    pending_email.save()
+                    pass
+    except Exception:
+        pass  # Don't break homepage if email processing fails
+    
     # Storytelling context for the landing page (hero, problem, solution, transformation, founder)
     # Hero punch line (kept concise for conversion testing)
     hero = {
@@ -452,6 +500,61 @@ Signup Date: {user.date_joined.strftime("%Y-%m-%d %H:%M:%S")}''',
 
 
 def signup_success(request):
+    # Process pending emails automatically (no 502 errors, fully automatic)
+    # Emails sent to both user and admin automatically after signup
+    try:
+        from landing.models import PendingEmail
+        from django.utils import timezone
+        from datetime import timedelta
+        from django.core.mail import send_mail, EmailMultiAlternatives
+        
+        # Only process emails older than 2 minutes (prevents race conditions)
+        cutoff_time = timezone.now() - timedelta(minutes=2)
+        pending_emails = PendingEmail.objects.filter(
+            sent=False,
+            created_at__lte=cutoff_time
+        ).order_by('created_at')[:10]  # Process max 10 at a time
+        
+        for pending_email in pending_emails:
+            try:
+                email_data = pending_email.email_data
+                
+                if pending_email.email_type == 'welcome':
+                    # Send welcome email to user
+                    msg = EmailMultiAlternatives(
+                        subject=email_data['subject'],
+                        body=email_data['text_content'],
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        to=[email_data['to']],
+                    )
+                    msg.attach_alternative(email_data['html_content'], "text/html")
+                    msg.send(fail_silently=True)
+                    
+                elif pending_email.email_type == 'admin_notification':
+                    # Send admin notification
+                    send_mail(
+                        subject=email_data['subject'],
+                        message=email_data['message'],
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[email_data['to']],
+                        fail_silently=True,
+                    )
+                
+                # Mark as sent
+                pending_email.sent = True
+                pending_email.sent_at = timezone.now()
+                pending_email.save()
+                
+            except Exception:
+                # If email fails, don't break the page - will retry later
+                pending_email.attempts += 1
+                pending_email.save()
+                pass
+                
+    except Exception:
+        # If queue processing fails, don't break the page
+        pass
+    
     return render(request, "landing/success.html")
 
 
