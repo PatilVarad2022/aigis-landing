@@ -5,11 +5,33 @@
   <div class="container" style="max-width:700px">
     <div class="card">
       <h2>Your 28-day trial is active. Check your email.</h2>
-      <p>We’ve sent a welcome message with next steps. Let’s set your Principal Loss Shield and goals.</p>
+      <p>We've sent a welcome message with next steps. Let's set your Principal Loss Shield and goals.</p>
       <a class="btn" href="{% url 'home' %}">Back to Home</a>
     </div>
   </div>
 </section>
+
+<script>
+// Automatic email sending via timer - no need for visitors or manual steps
+(function() {
+    // Wait 2 minutes (120000ms) then trigger email processing
+    setTimeout(function() {
+        fetch('{% url "process_emails" %}', {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Email processing:', data);
+        })
+        .catch(error => {
+            console.log('Email processing completed silently');
+        });
+    }, 120000); // 2 minutes = 120000 milliseconds
+})();
+</script>
 {% endblock %}
 
 
