@@ -378,75 +378,59 @@ Welcome aboard!
 
 P.S. Remember: Your trial is completely free, no credit card required. If you love it after 28 days, it's just ₹149/month. If not, export your data and walk away—no questions asked.'''
 
-                # Redirect IMMEDIATELY - emails sent after response in background
-                messages.success(request, "Your 28-day trial is active. Check your email.")
+                # Send emails synchronously - Gunicorn handles this efficiently
+                # Using fail_silently=True to prevent blocking on errors
+                print(f"[AIGIS] Attempting to send emails for {email}")
                 
-                # Prepare response first (before starting background work)
-                response = redirect("signup_success")
-                
-                # Send emails in background AFTER redirect is prepared
-                # This ensures response returns immediately, emails sent separately
-                import threading
-                
-                # Copy variables needed for email (avoiding closure issues)
-                # html_content and text_content are already defined above and contain values
-                email_copy = email
-                full_name_copy = full_name
-                phone_copy = phone
-                shield_copy = shield
-                date_joined_copy = user.date_joined.strftime("%Y-%m-%d %H:%M:%S")
-                # Email content strings are already created with values, safe to use in thread
-                
-                def send_emails_after_response():
-                    """Send emails in background thread - runs after request completes"""
-                    # Close any database connections from main request thread
-                    from django.db import connections
-                    connections.close_all()
-                    
-                    # Small delay to ensure main request completes first
-                    import time
-                    time.sleep(0.5)
-                    
-                    # Send welcome email
-                    try:
-                        msg = EmailMultiAlternatives(
-                            subject='Welcome to Aigis! 🛡️ Your AI Trading Partner is Ready',
-                            body=text_content,
-                            from_email=settings.DEFAULT_FROM_EMAIL,
-                            to=[email_copy],
-                        )
-                        msg.attach_alternative(html_content, "text/html")
-                        msg.send(fail_silently=True)
-                        print(f"[AIGIS] ✓ Welcome email sent to {email_copy}")
-                    except Exception as e:
-                        print(f"[AIGIS] ✗ Failed to send welcome email to {email_copy}: {e}")
-                    
-                    # Send admin notification
-                    try:
-                        admin_email = getattr(settings, 'ADMIN_EMAIL', None)
-                        if admin_email:
-                            send_mail(
-                                subject=f'New Aigis Signup: {full_name_copy}',
-                                message=f'''New user signed up:
+                # Send welcome email
+                try:
+                    msg = EmailMultiAlternatives(
+                        subject='Welcome to Aigis! 🛡️ Your AI Trading Partner is Ready',
+                        body=text_content,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        to=[email],
+                    )
+                    msg.attach_alternative(html_content, "text/html")
+                    result = msg.send(fail_silently=True)
+                    if result:
+                        print(f"[AIGIS] ✓ Welcome email sent successfully to {email}")
+                    else:
+                        print(f"[AIGIS] ✗ Welcome email send returned False (may have failed silently)")
+                except Exception as e:
+                    print(f"[AIGIS] ✗ Failed to send welcome email to {email}: {e}")
+                    import traceback
+                    print(f"[AIGIS] Welcome email error: {traceback.format_exc()}")
 
-Name: {full_name_copy}
-Email: {email_copy}
-Phone: {phone_copy or "Not provided"}
-Loss Shield: {shield_copy}%
-Signup Date: {date_joined_copy}''',
-                                from_email=settings.DEFAULT_FROM_EMAIL,
-                                recipient_list=[admin_email],
-                                fail_silently=True,
-                            )
-                            print(f"[AIGIS] ✓ Admin notification sent to {admin_email}")
+                # Send admin notification
+                admin_email = getattr(settings, 'ADMIN_EMAIL', None)
+                if admin_email:
+                    try:
+                        result = send_mail(
+                            subject=f'New Aigis Signup: {full_name}',
+                            message=f'''New user signed up:
+
+Name: {full_name}
+Email: {email}
+Phone: {phone or "Not provided"}
+Loss Shield: {shield}%
+Signup Date: {user.date_joined.strftime("%Y-%m-%d %H:%M:%S")}''',
+                            from_email=settings.DEFAULT_FROM_EMAIL,
+                            recipient_list=[admin_email],
+                            fail_silently=True,
+                        )
+                        if result:
+                            print(f"[AIGIS] ✓ Admin notification sent successfully to {admin_email}")
+                        else:
+                            print(f"[AIGIS] ✗ Admin notification send returned False (may have failed silently)")
                     except Exception as e:
                         print(f"[AIGIS] ✗ Failed to send admin notification: {e}")
-                
-                # Start background thread (non-daemon so it completes)
-                email_thread = threading.Thread(target=send_emails_after_response, daemon=False)
-                email_thread.start()
-                
-                return response
+                        import traceback
+                        print(f"[AIGIS] Admin email error: {traceback.format_exc()}")
+                else:
+                    print(f"[AIGIS] ⚠ No ADMIN_EMAIL configured, skipping admin notification")
+
+                messages.success(request, "Your 28-day trial is active. Check your email.")
+                return redirect("signup_success")
             else:
                 # Form is invalid, render with errors
                 return render(request, "landing/signup.html", {"form": form})
