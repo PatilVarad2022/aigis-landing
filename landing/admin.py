@@ -23,10 +23,17 @@ admin.site.unregister(User)
 class CustomUserAdmin(BaseUserAdmin):
     list_display = ('username', 'email', 'has_profile', 'full_name', 'phone', 'shield_percent', 'date_joined', 'is_staff', 'is_active')
     list_filter = ('is_staff', 'is_superuser', 'is_active', 'date_joined')
-    search_fields = ('username', 'email', 'profile__full_name', 'profile__phone')
+    search_fields = ('username', 'email')  # Simplified search to avoid profile errors
     ordering = ('-date_joined',)
     inlines = (UserProfileInline,)
     list_per_page = 100  # Show more users per page
+    
+    def get_queryset(self, request):
+        """Optimize queryset and handle users without profiles safely"""
+        qs = super().get_queryset(request)
+        # Use select_related for OneToOne - but it will fail if profile doesn't exist
+        # So we don't use it and handle DoesNotExist in the methods instead
+        return qs
     
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
@@ -45,41 +52,43 @@ class CustomUserAdmin(BaseUserAdmin):
     )
     
     def has_profile(self, obj):
-        if hasattr(obj, 'profile'):
+        try:
+            # Use try/except for DoesNotExist
+            obj.profile
             return format_html('<span style="color: #00FF8C;">✓ Yes</span>')
-        return format_html('<span style="color: #fca5a5;">✗ No</span>')
+        except (UserProfile.DoesNotExist, AttributeError):
+            return format_html('<span style="color: #fca5a5;">✗ No</span>')
+        except:
+            return format_html('<span style="color: #fca5a5;">✗ No</span>')
     has_profile.short_description = 'Has Profile'
     has_profile.boolean = True
     
     def full_name(self, obj):
         try:
-            if hasattr(obj, 'profile') and obj.profile:
-                return obj.profile.full_name
+            return obj.profile.full_name
+        except (UserProfile.DoesNotExist, AttributeError):
+            return format_html('<span style="color: #94a3b8; font-style: italic;">No profile</span>')
         except:
-            pass
-        return format_html('<span style="color: #94a3b8; font-style: italic;">No profile</span>')
+            return format_html('<span style="color: #94a3b8; font-style: italic;">No profile</span>')
     full_name.short_description = 'Full Name'
-    # Removed admin_order_field to prevent errors when users don't have profiles
     
     def phone(self, obj):
         try:
-            if hasattr(obj, 'profile') and obj.profile:
-                return obj.profile.phone or '-'
+            return obj.profile.phone or '-'
+        except (UserProfile.DoesNotExist, AttributeError):
+            return '-'
         except:
-            pass
-        return '-'
+            return '-'
     phone.short_description = 'Phone'
-    # Removed admin_order_field to prevent errors
     
     def shield_percent(self, obj):
         try:
-            if hasattr(obj, 'profile') and obj.profile:
-                return f"{obj.profile.shield_limit_percent}%"
+            return f"{obj.profile.shield_limit_percent}%"
+        except (UserProfile.DoesNotExist, AttributeError):
+            return '-'
         except:
-            pass
-        return '-'
+            return '-'
     shield_percent.short_description = 'Loss Shield'
-    # Removed admin_order_field to prevent errors
     
     # Bulk actions for User admin
     actions = ['delete_all_users_action', 'create_missing_profiles', 'delete_orphaned_users']
@@ -89,14 +98,19 @@ class CustomUserAdmin(BaseUserAdmin):
         from django.contrib.auth.models import User
         
         # Find users without profiles (excluding superusers)
-        orphaned_users = User.objects.filter(is_superuser=False).exclude(
-            id__in=UserProfile.objects.values_list('user_id', flat=True)
-        )
+        # Get all user IDs that have profiles
+        users_with_profiles = set(UserProfile.objects.values_list('user_id', flat=True))
         
-        count = orphaned_users.count()
+        # Find orphaned users (no profile, not superuser)
+        all_users = User.objects.filter(is_superuser=False)
+        orphaned_users = [user for user in all_users if user.id not in users_with_profiles]
+        
+        count = len(orphaned_users)
         if count > 0:
-            orphaned_users.delete()
-            self.message_user(request, f"Deleted {count} orphaned user(s) without profiles.")
+            # Delete orphaned users
+            deleted = User.objects.filter(id__in=[u.id for u in orphaned_users]).delete()
+            deleted_count = deleted[0] if isinstance(deleted, tuple) else count
+            self.message_user(request, f"Deleted {deleted_count} orphaned user(s) without profiles.")
         else:
             self.message_user(request, "No orphaned users found (all users have profiles or are superusers).")
     delete_orphaned_users.short_description = "Delete orphaned users (users without profiles)"
@@ -122,19 +136,20 @@ class CustomUserAdmin(BaseUserAdmin):
         from django.contrib.auth.models import User
         from .models import UserProfile
         
-        total_users = User.objects.count()
-        total_profiles = UserProfile.objects.count()
+        total_users_before = User.objects.count()
+        total_profiles_before = UserProfile.objects.count()
         
-        # Don't delete superusers - only regular users
-        deleted_users = User.objects.filter(is_superuser=False).delete()[0]
-        deleted_profiles = UserProfile.objects.count()
+        # Delete all regular users (this will cascade delete profiles)
+        # First delete profiles explicitly, then users
+        UserProfile.objects.all().delete()
+        result = User.objects.filter(is_superuser=False).delete()
+        deleted_count = result[0] if isinstance(result, tuple) else 0
         
-        # Recalculate after deletion
         remaining_users = User.objects.count()
         
         self.message_user(
             request,
-            f"Deleted {deleted_users} regular user(s) and {deleted_profiles} profile(s). "
+            f"Deleted {deleted_count} regular user(s) and {total_profiles_before} profile(s). "
             f"{remaining_users} user(s) remain (superusers preserved).",
             level='warning'
         )
