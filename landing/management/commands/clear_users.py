@@ -32,17 +32,25 @@ class Command(BaseCommand):
         
         self.stdout.write('\nDeleting all users and profiles...')
         
+        # Get count before deletion
+        regular_users = User.objects.filter(is_superuser=False)
+        user_count_before = regular_users.count()
+        profile_count_before = UserProfile.objects.count()
+        
         # Delete UserProfiles first (they have foreign keys to User)
         deleted_profiles = UserProfile.objects.all().delete()
         self.stdout.write(f'Deleted {deleted_profiles[0]} profiles')
         
-        # Delete Users
-        deleted_users = User.objects.all().delete()
-        self.stdout.write(f'Deleted {deleted_users[0]} users')
+        # Delete only regular users (preserve superusers)
+        deleted_users = regular_users.delete()
+        deleted_count = deleted_users[0] if isinstance(deleted_users, tuple) else user_count_before
+        
+        remaining_superusers = User.objects.filter(is_superuser=True).count()
         
         self.stdout.write(self.style.SUCCESS(
-            f'\n✓ Successfully cleared all user data!\n'
-            f'   - {deleted_users[0]} users deleted\n'
-            f'   - {deleted_profiles[0]} profiles deleted'
+            f'\n✓ Successfully cleared all regular user data!\n'
+            f'   - {deleted_count} regular users deleted\n'
+            f'   - {deleted_profiles[0]} profiles deleted\n'
+            f'   - {remaining_superusers} superuser(s) preserved'
         ))
 
