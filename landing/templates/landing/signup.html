@@ -1,0 +1,122 @@
+{% extends 'landing/base.html' %}
+{% block title %}Sign up — Aigis{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="container grid grid-2">
+    <div>
+      <h2>Create your account</h2>
+      <p style="opacity:.85">Set your <strong>Loss Shield (5–20%)</strong>, get plain‑English XAI for every decision, and start your 28‑day trial. No card required.</p>
+      {% if messages %}
+        <div>
+          {% for message in messages %}
+            <div class="card">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+      <!-- Signup Loading Screen -->
+      <div id="signupLoader" style="position:fixed;inset:0;background:var(--bg);z-index:9999;display:none;align-items:center;justify-content:center;transition:opacity 0.3s ease">
+        <div style="text-align:center">
+          <div style="width:120px;height:144px;margin:0 auto 24px;position:relative">
+            <svg width="120" height="144" viewBox="0 0 64 64" style="filter:drop-shadow(0 10px 30px rgba(0,255,140,.3))">
+              <path d="M32 4l24 8v16c0 12.7-8.8 24.4-24 32C16.8 52.4 8 40.7 8 28V12z" fill="url(#shieldGradSignup)" opacity="0.9"/>
+              <defs>
+                <linearGradient id="shieldGradSignup" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" style="stop-color:#0067FF;stop-opacity:1" />
+                  <stop offset="100%" style="stop-color:#00FF8C;stop-opacity:1" />
+                </linearGradient>
+              </defs>
+              <text x="32" y="38" font-family="Montserrat, Arial, sans-serif" font-size="24" font-weight="900" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" opacity="0.95">A</text>
+              <circle cx="32" cy="32" r="20" fill="none" stroke="rgba(0,255,140,.5)" stroke-width="2" class="pulse-ring" style="animation-duration:1.5s"/>
+              <circle cx="32" cy="32" r="20" fill="none" stroke="rgba(0,103,255,.5)" stroke-width="2" class="pulse-ring" style="animation-delay:0.75s;animation-duration:1.5s"/>
+            </svg>
+          </div>
+          <div style="font-size:18px;color:var(--text);font-weight:600">Activating Your Shield...</div>
+        </div>
+      </div>
+      <form method="post" novalidate id="signupForm">
+        {% csrf_token %}
+        <div class="card" style="display:grid; gap:12px">
+          <label>Name <input type="text" name="full_name" value="{{ form.full_name.value|default:'' }}" maxlength="150" required></label>
+          {% if form.full_name.errors %}<small style="color:#fca5a5">{{ form.full_name.errors.0 }}</small>{% endif %}
+
+          <label>Email <input type="email" name="email" value="{{ form.email.value|default:'' }}" required></label>
+          {% if form.email.errors %}<small style="color:#fca5a5">{{ form.email.errors.0 }}</small>{% endif %}
+
+          <label>Password 
+            <div style="display:flex;gap:8px;align-items:center">
+              <input id="password" type="password" name="password" required style="flex:1">
+              <button type="button" id="togglePw" class="btn secondary" style="padding:6px 10px">Show</button>
+            </div>
+          </label>
+          <small id="pwHelp">8+ chars, 1 uppercase, 1 number</small>
+          <div id="pwMeter" style="height:8px;border-radius:6px;background:rgba(255,255,255,.15);overflow:hidden">
+            <div id="pwBar" style="height:100%;width:0;background:linear-gradient(90deg,#ef4444,#f59e0b,#10b981)"></div>
+          </div>
+          <ul id="pwChecklist" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0 0 0;padding:0;list-style:none;font-size:12px;opacity:.9">
+            <li id="chkLen">• 8+ characters</li>
+            <li id="chkUpper">• 1 uppercase letter</li>
+            <li id="chkNum">• 1 number</li>
+          </ul>
+          {% if form.password.errors %}<small style="color:#fca5a5">{{ form.password.errors.0 }}</small>{% endif %}
+
+          <label>Phone (optional) <input type="text" name="phone" pattern="\\d{10}" maxlength="10" value="{{ form.phone.value|default:'' }}" placeholder="10 digits"></label>
+          {% if form.phone.errors %}<small style="color:#fca5a5">{{ form.phone.errors.0 }}</small>{% endif %}
+
+          <label>Set your maximum acceptable loss (%)
+            <input id="shield" type="range" min="5" max="20" value="{{ form.shield_limit_percent.value|default:10 }}" oninput="document.getElementById('shieldVal').textContent=this.value">
+          </label>
+          <small>Allowed range: 5–20%. Default <span id="shieldVal">{{ form.shield_limit_percent.value|default:10 }}</span>%.</small>
+          <input type="hidden" name="shield_limit_percent" id="shieldHidden" value="{{ form.shield_limit_percent.value|default:10 }}">
+          {% if form.shield_limit_percent.errors %}<small style="color:#fca5a5">{{ form.shield_limit_percent.errors.0 }}</small>{% endif %}
+
+          <button class="btn" data-track="form_submit" type="submit">Activate 28-day Trial</button>
+        </div>
+      </form>
+      <p style="margin-top:12px"><small>By continuing you agree to our <a href="{% url 'terms' %}">Terms</a> and <a href="{% url 'privacy' %}">Privacy Policy</a>. No spam, ever.</small></p>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Why join now</h3>
+        <ul>
+          <li>Set your Loss Shield in under 30 seconds</li>
+          <li>Plain‑English XAI for every decision</li>
+          <li>28‑day full access — ₹0 today</li>
+        </ul>
+        <div style="display:flex; gap:10px; margin-top:8px; opacity:.9; flex-wrap:wrap">
+          <small>Compliance‑first</small>
+          <small>256‑bit encryption</small>
+          <small>AWS/GCP</small>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const pw=document.getElementById('password');
+    const bar=document.getElementById('pwBar');
+    const meter=(v)=>{let s=0; if(v.length>=8) s++; if(/[A-Z]/.test(v)) s++; if(/\d/.test(v)) s++; bar.style.width=(s/3*100)+'%';
+      document.getElementById('chkLen').style.opacity=v.length>=8?1:.6;
+      document.getElementById('chkUpper').style.opacity=/[A-Z]/.test(v)?1:.6;
+      document.getElementById('chkNum').style.opacity=/\d/.test(v)?1:.6;
+    };
+    pw&&pw.addEventListener('input', e=>meter(e.target.value));
+    const toggle=document.getElementById('togglePw');
+    toggle&&toggle.addEventListener('click', ()=>{ const t=pw.getAttribute('type')==='password'?'text':'password'; pw.setAttribute('type', t); toggle.textContent=t==='text'?'Hide':'Show'; });
+    const shield=document.getElementById('shield'); const hidden=document.getElementById('shieldHidden');
+    function sync(){ hidden.value=shield.value; }
+    shield&&shield.addEventListener('input', sync);
+    sync();
+    
+    // Show shield loader on form submit
+    const form = document.getElementById('signupForm');
+    const loader = document.getElementById('signupLoader');
+    if (form && loader) {
+      form.addEventListener('submit', function(e) {
+        loader.style.display = 'flex';
+        // The form will submit and redirect, loader will be visible for ~1 second
+      });
+    }
+  </script>
+</section>
+{% endblock %}
+
+
