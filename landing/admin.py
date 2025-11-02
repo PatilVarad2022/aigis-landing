@@ -221,7 +221,23 @@ class UserProfileAdmin(admin.ModelAdmin):
     # Removed changelist_view - was causing issues
     
     # Bulk actions
-    actions = ['export_selected_profiles', 'delete_selected', 'delete_all_users']
+    actions = ['export_selected_profiles', 'delete_selected', 'delete_all_users', 'delete_all_orphaned_users']
+    
+    def delete_all_orphaned_users(self, request, queryset):
+        """Delete ALL users without profiles (orphaned users) - works on any queryset"""
+        from django.contrib.auth.models import User
+        
+        # Find all users that don't have profiles (excluding superusers)
+        users_with_profiles = set(UserProfile.objects.values_list('user_id', flat=True))
+        all_users = User.objects.filter(is_superuser=False)
+        orphaned_users = [u.id for u in all_users if u.id not in users_with_profiles]
+        
+        if orphaned_users:
+            User.objects.filter(id__in=orphaned_users).delete()
+            self.message_user(request, f"Deleted {len(orphaned_users)} orphaned user(s) without profiles.")
+        else:
+            self.message_user(request, "No orphaned users found.")
+    delete_all_orphaned_users.short_description = "🗑️ DELETE ALL ORPHANED USERS (no profile)"
     
     def delete_all_users(self, request, queryset):
         """Delete ALL regular users and profiles - USE WITH CAUTION!"""
