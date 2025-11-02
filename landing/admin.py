@@ -63,6 +63,32 @@ class CustomUserAdmin(BaseUserAdmin):
         return '-'
     shield_percent.short_description = 'Loss Shield'
     shield_percent.admin_order_field = 'profile__shield_limit_percent'
+    
+    # Bulk actions for User admin
+    actions = ['delete_all_users_action']
+    
+    def delete_all_users_action(self, request, queryset):
+        """Delete ALL users and profiles - USE WITH CAUTION!"""
+        from django.contrib.auth.models import User
+        from .models import UserProfile
+        
+        total_users = User.objects.count()
+        total_profiles = UserProfile.objects.count()
+        
+        # Don't delete superusers - only regular users
+        deleted_users = User.objects.filter(is_superuser=False).delete()[0]
+        deleted_profiles = UserProfile.objects.count()
+        
+        # Recalculate after deletion
+        remaining_users = User.objects.count()
+        
+        self.message_user(
+            request,
+            f"Deleted {deleted_users} regular user(s) and {deleted_profiles} profile(s). "
+            f"{remaining_users} user(s) remain (superusers preserved).",
+            level='warning'
+        )
+    delete_all_users_action.short_description = "⚠️ DELETE ALL REGULAR USERS (keeps superusers)"
 
 
 # Register the custom User admin
@@ -122,7 +148,24 @@ class UserProfileAdmin(admin.ModelAdmin):
         return qs.select_related('user')
     
     # Bulk actions
-    actions = ['export_selected_profiles', 'delete_selected']
+    actions = ['export_selected_profiles', 'delete_selected', 'delete_all_users']
+    
+    def delete_all_users(self, request, queryset):
+        """Delete ALL users and profiles - USE WITH CAUTION!"""
+        from django.contrib.auth.models import User
+        
+        total_users = User.objects.count()
+        total_profiles = UserProfile.objects.count()
+        
+        # Delete all users (this will cascade delete profiles)
+        deleted_count = User.objects.all().delete()[0]
+        
+        self.message_user(
+            request,
+            f"Successfully deleted ALL user data: {deleted_count} user(s) and {total_profiles} profile(s) removed.",
+            level='warning'
+        )
+    delete_all_users.short_description = "⚠️ DELETE ALL USERS (IRREVERSIBLE)"
     
     def export_selected_profiles(self, request, queryset):
         """Export selected profiles to a simple text format"""
