@@ -13,9 +13,13 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 import dj_database_url
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env file
+load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
@@ -80,10 +84,12 @@ WSGI_APPLICATION = 'mysite.wsgi.application'
 if os.environ.get('DATABASE_URL'):
     db_config = dj_database_url.config(
         default=os.environ.get('DATABASE_URL'),
-        conn_max_age=600
+        conn_max_age=0  # Neon closes idle connections, so don't reuse them
     )
     # Ensure we use PostgreSQL backend (works with both psycopg2 and psycopg3)
     db_config['ENGINE'] = 'django.db.backends.postgresql'
+    # Add SSL requirement for Neon
+    db_config.setdefault('OPTIONS', {})['sslmode'] = 'require'
     DATABASES = {
         'default': db_config
     }
