@@ -138,9 +138,9 @@ def signup(request):
                     user = User.objects.create_user(username=email, email=email, password=password)
                     UserProfile.objects.create(user=user, full_name=full_name, phone=phone, shield_limit_percent=shield)
 
-            # Send welcome email to user (HTML formatted)
-            try:
-                html_content = f'''
+                # Send welcome email to user (HTML formatted)
+                try:
+                    html_content = f'''
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -318,8 +318,8 @@ def signup(request):
 </html>
 '''
                 
-                # Plain text version for email clients that don't support HTML
-                text_content = f'''Hi {full_name},
+                    # Plain text version for email clients that don't support HTML
+                    text_content = f'''Hi {full_name},
 
 Welcome to Aigis! We're thrilled to have you join us. You've just taken the first step toward trading with discipline, protection, and AI-powered accountability.
 
@@ -357,29 +357,29 @@ Welcome aboard!
 
 P.S. Remember: Your trial is completely free, no credit card required. If you love it after 28 days, it's just ₹149/month. If not, export your data and walk away—no questions asked.'''
                 
-                # Send HTML email
-                msg = EmailMultiAlternatives(
-                    subject='Welcome to Aigis! 🛡️ Your AI Trading Partner is Ready',
-                    body=text_content,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    to=[email],
-                )
-                msg.attach_alternative(html_content, "text/html")
-                msg.send(fail_silently=False)
-                print(f"[AIGIS] ✓ Welcome email sent successfully to {email}")
-            except Exception as e:
-                print(f"[AIGIS] ✗ Failed to send welcome email to {email}: {e}")
-                import traceback
-                print(f"[AIGIS] Error details: {traceback.format_exc()}")
-                # Still continue even if email fails
+                    # Send HTML email
+                    msg = EmailMultiAlternatives(
+                        subject='Welcome to Aigis! 🛡️ Your AI Trading Partner is Ready',
+                        body=text_content,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        to=[email],
+                    )
+                    msg.attach_alternative(html_content, "text/html")
+                    msg.send(fail_silently=False)
+                    print(f"[AIGIS] ✓ Welcome email sent successfully to {email}")
+                except Exception as e:
+                    print(f"[AIGIS] ✗ Failed to send welcome email to {email}: {e}")
+                    import traceback
+                    print(f"[AIGIS] Error details: {traceback.format_exc()}")
+                    # Still continue even if email fails
 
-            # Send notification email to admin
-            admin_email = getattr(settings, 'ADMIN_EMAIL', None)
-            if admin_email:
-                try:
-                    send_mail(
-                        subject=f'New Aigis Signup: {full_name}',
-                        message=f'''New user signed up:
+                # Send notification email to admin
+                admin_email = getattr(settings, 'ADMIN_EMAIL', None)
+                if admin_email:
+                    try:
+                        send_mail(
+                            subject=f'New Aigis Signup: {full_name}',
+                            message=f'''New user signed up:
 
 Name: {full_name}
 Email: {email}
@@ -391,21 +391,21 @@ Total users: {User.objects.count()}''',
                         from_email=settings.DEFAULT_FROM_EMAIL,
                         recipient_list=[admin_email],
                         fail_silently=False,
-                    )
-                    print(f"[AIGIS] ✓ Admin notification sent successfully to {admin_email}")
-                except Exception as e:
-                    print(f"[AIGIS] ✗ Failed to send admin notification: {e}")
-                    import traceback
-                    print(f"[AIGIS] Admin notification error details: {traceback.format_exc()}")
+                        )
+                        print(f"[AIGIS] ✓ Admin notification sent successfully to {admin_email}")
+                    except Exception as e:
+                        print(f"[AIGIS] ✗ Failed to send admin notification: {e}")
+                        import traceback
+                        print(f"[AIGIS] Admin notification error details: {traceback.format_exc()}")
 
-            messages.success(request, "Your 28-day trial is active. Check your email.")
-            return redirect("signup_success")
+                messages.success(request, "Your 28-day trial is active. Check your email.")
+                return redirect("signup_success")
+            else:
+                # Form is invalid, render with errors
+                return render(request, "landing/signup.html", {"form": form})
         else:
-            # Form is invalid, render with errors
+            form = SignupForm()
             return render(request, "landing/signup.html", {"form": form})
-    else:
-        form = SignupForm()
-    return render(request, "landing/signup.html", {"form": form})
     except Exception as e:
         # Log the error for debugging
         import logging
