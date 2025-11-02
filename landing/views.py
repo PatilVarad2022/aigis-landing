@@ -128,15 +128,30 @@ def signup(request):
         if request.method == "POST":
             form = SignupForm(request.POST)
             if form.is_valid():
-                with transaction.atomic():
-                    email = form.cleaned_data["email"].lower()
-                    password = form.cleaned_data["password"]
-                    full_name = form.cleaned_data["full_name"]
-                    phone = form.cleaned_data["phone"]
-                    shield = form.cleaned_data["shield_limit_percent"]
+                try:
+                    with transaction.atomic():
+                        email = form.cleaned_data["email"].lower()
+                        password = form.cleaned_data["password"]
+                        full_name = form.cleaned_data["full_name"]
+                        phone = form.cleaned_data["phone"]
+                        shield = form.cleaned_data["shield_limit_percent"]
 
-                    user = User.objects.create_user(username=email, email=email, password=password)
-                    UserProfile.objects.create(user=user, full_name=full_name, phone=phone, shield_limit_percent=shield)
+                        # Check if user already exists (double-check)
+                        if User.objects.filter(username=email).exists() or User.objects.filter(email=email).exists():
+                            form.add_error('email', 'An account with this email already exists. Please use a different email or try logging in.')
+                            return render(request, "landing/signup.html", {"form": form})
+
+                        user = User.objects.create_user(username=email, email=email, password=password)
+                        UserProfile.objects.create(user=user, full_name=full_name, phone=phone, shield_limit_percent=shield)
+                except Exception as db_error:
+                    # Catch database constraint errors (duplicate username/email)
+                    error_msg = str(db_error)
+                    if 'duplicate key' in error_msg.lower() or 'already exists' in error_msg.lower() or 'unique constraint' in error_msg.lower():
+                        form.add_error('email', 'An account with this email already exists. Please use a different email or try logging in.')
+                        return render(request, "landing/signup.html", {"form": form})
+                    else:
+                        # Re-raise other database errors to be caught by outer exception handler
+                        raise
 
                 # Send welcome email to user (HTML formatted)
                 try:
