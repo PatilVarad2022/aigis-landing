@@ -52,25 +52,34 @@ class CustomUserAdmin(BaseUserAdmin):
     has_profile.boolean = True
     
     def full_name(self, obj):
-        if hasattr(obj, 'profile'):
-            return obj.profile.full_name
+        try:
+            if hasattr(obj, 'profile') and obj.profile:
+                return obj.profile.full_name
+        except:
+            pass
         return format_html('<span style="color: #94a3b8; font-style: italic;">No profile</span>')
     full_name.short_description = 'Full Name'
-    full_name.admin_order_field = 'profile__full_name'
+    # Removed admin_order_field to prevent errors when users don't have profiles
     
     def phone(self, obj):
-        if hasattr(obj, 'profile'):
-            return obj.profile.phone or '-'
+        try:
+            if hasattr(obj, 'profile') and obj.profile:
+                return obj.profile.phone or '-'
+        except:
+            pass
         return '-'
     phone.short_description = 'Phone'
-    phone.admin_order_field = 'profile__phone'
+    # Removed admin_order_field to prevent errors
     
     def shield_percent(self, obj):
-        if hasattr(obj, 'profile'):
-            return f"{obj.profile.shield_limit_percent}%"
+        try:
+            if hasattr(obj, 'profile') and obj.profile:
+                return f"{obj.profile.shield_limit_percent}%"
+        except:
+            pass
         return '-'
     shield_percent.short_description = 'Loss Shield'
-    shield_percent.admin_order_field = 'profile__shield_limit_percent'
+    # Removed admin_order_field to prevent errors
     
     # Bulk actions for User admin
     actions = ['delete_all_users_action', 'create_missing_profiles']
@@ -171,17 +180,7 @@ class UserProfileAdmin(admin.ModelAdmin):
         qs = super().get_queryset(request)
         return qs.select_related('user')
     
-    def changelist_view(self, request, extra_context=None):
-        """Add total count to admin interface"""
-        response = super().changelist_view(request, extra_context)
-        try:
-            qs = response.context_data['cl'].queryset
-            total_users = qs.count()
-            users_with_profiles = UserProfile.objects.count()
-            response.context_data['summary_line'] = f"Total: {total_users} users | With profiles: {users_with_profiles}"
-        except:
-            pass
-        return response
+    # Removed changelist_view - was causing issues
     
     # Bulk actions
     actions = ['export_selected_profiles', 'delete_selected', 'delete_all_users']
@@ -193,15 +192,17 @@ class UserProfileAdmin(admin.ModelAdmin):
         total_users = User.objects.count()
         total_profiles = UserProfile.objects.count()
         
-        # Delete all users (this will cascade delete profiles)
-        deleted_count = User.objects.all().delete()[0]
+        # Don't delete superusers - only regular users and their profiles
+        # Delete all regular users (this will cascade delete profiles)
+        result = User.objects.filter(is_superuser=False).delete()
+        deleted_count = result[0] if isinstance(result, tuple) else 0
         
         self.message_user(
             request,
-            f"Successfully deleted ALL user data: {deleted_count} user(s) and {total_profiles} profile(s) removed.",
+            f"Successfully deleted {deleted_count} regular user(s) and all associated profile(s). Superusers preserved.",
             level='warning'
         )
-    delete_all_users.short_description = "⚠️ DELETE ALL USERS (IRREVERSIBLE)"
+    delete_all_users.short_description = "⚠️ DELETE ALL REGULAR USERS (keeps superusers)"
     
     def export_selected_profiles(self, request, queryset):
         """Export selected profiles to a simple text format"""
@@ -229,9 +230,14 @@ class UserProfileAdmin(admin.ModelAdmin):
     def delete_selected(self, request, queryset):
         """Delete selected profiles and their associated users"""
         count = 0
+        users_deleted = set()
         for profile in queryset:
-            profile.user.delete()  # This will cascade delete the profile
-            count += 1
+            user = profile.user
+            user_id = user.id
+            if user_id not in users_deleted:
+                user.delete()  # This will cascade delete the profile
+                users_deleted.add(user_id)
+                count += 1
         
         self.message_user(request, f"Successfully deleted {count} profile(s) and associated user(s).")
     delete_selected.short_description = "Delete selected profiles (and users)"
