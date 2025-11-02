@@ -11,9 +11,15 @@ class UserProfileInline(admin.StackedInline):
     can_delete = False
     verbose_name_plural = 'Profile Information'
     fields = ('full_name', 'phone', 'shield_limit_percent')
+    extra = 0
     
     def has_add_permission(self, request, obj=None):
         return False
+    
+    def get_queryset(self, request):
+        """Safe queryset that won't error if profile doesn't exist"""
+        qs = super().get_queryset(request)
+        return qs
 
 
 # Unregister the default User admin and register our custom one
@@ -218,20 +224,25 @@ class UserProfileAdmin(admin.ModelAdmin):
     actions = ['export_selected_profiles', 'delete_selected', 'delete_all_users']
     
     def delete_all_users(self, request, queryset):
-        """Delete ALL users and profiles - USE WITH CAUTION!"""
+        """Delete ALL regular users and profiles - USE WITH CAUTION!"""
         from django.contrib.auth.models import User
         
-        total_users = User.objects.count()
-        total_profiles = UserProfile.objects.count()
+        total_users_before = User.objects.count()
+        total_profiles_before = UserProfile.objects.count()
         
-        # Don't delete superusers - only regular users and their profiles
-        # Delete all regular users (this will cascade delete profiles)
-        result = User.objects.filter(is_superuser=False).delete()
-        deleted_count = result[0] if isinstance(result, tuple) else 0
+        # Delete all profiles first
+        UserProfile.objects.all().delete()
+        
+        # Then delete all regular users (excluding superusers)
+        regular_users = User.objects.filter(is_superuser=False)
+        result = regular_users.delete()
+        deleted_count = result[0] if isinstance(result, tuple) else regular_users.count()
+        
+        remaining = User.objects.count()
         
         self.message_user(
             request,
-            f"Successfully deleted {deleted_count} regular user(s) and all associated profile(s). Superusers preserved.",
+            f"Deleted {deleted_count} regular user(s) and {total_profiles_before} profile(s). {remaining} user(s) remain (superusers).",
             level='warning'
         )
     delete_all_users.short_description = "⚠️ DELETE ALL REGULAR USERS (keeps superusers)"
