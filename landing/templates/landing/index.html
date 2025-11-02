@@ -5,7 +5,7 @@
   <!-- Hero -->
   <section id="hero" class="section" style="position:relative;overflow:hidden">
     <!-- Subtle Shield Animation (Background Decorative) -->
-    <div style="position:absolute;top:50%;right:5%;transform:translateY(-50%);width:120px;height:120px;opacity:0.15;z-index:0;pointer-events:none">
+    <div style="position:absolute;top:50%;right:5%;transform:translateY(-50%);width:120px;height:120px;opacity:0.15;z-index:0;pointer-events:none" class="hero-decoration">
       <svg width="120" height="144" viewBox="0 0 64 64" style="filter:drop-shadow(0 10px 30px rgba(0,255,140,.2))">
         <path d="M32 4l24 8v16c0 12.7-8.8 24.4-24 32C16.8 52.4 8 40.7 8 28V12z" fill="url(#shieldGradSubtle)" opacity="0.6"/>
         <defs>
@@ -23,7 +23,7 @@
       <div class="reveal">
         <h1><span style="opacity:.85">91% of traders lose money.</span> <br>Not anymore.</h1>
         <p style="font-size:18px"><strong>Shield first.</strong> You set your Principal Loss Shield; the AI enforces it. Stop trading on fear. Start investing with <strong>AI accountability</strong>. 28‑day free trial.</p>
-        <div style="display:flex; gap:12px; margin-top:16px;flex-wrap:wrap">
+        <div style="display:flex; gap:12px; margin-top:16px;flex-wrap:wrap" class="hero-buttons">
           <a class="btn" data-track="cta_click" href="{% url 'signup' %}">Get AI analysis of your portfolio — Free</a>
           <a class="btn accent" href="#why">See the XAI Audit in Action</a>
         </div>
@@ -214,11 +214,13 @@
         <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--primary),var(--accent));opacity:.5"></div>
         <h3 style="margin-bottom:12px">Digital Witness (XAI Audit)</h3>
         <p style="margin-bottom:20px">We translate complex logic into plain English. Every decision includes the Decision, the Cause, and how it protected your <strong style="color:var(--accent)">Loss Shield</strong>.</p>
+        <div class="table-wrapper">
         <table style="width:100%;border-collapse:collapse;margin-top:16px">
           <tr><td style="border-bottom:1px solid rgba(255,255,255,.08);padding:10px 0"><strong>Decision</strong></td><td style="border-bottom:1px solid rgba(255,255,255,.08);padding:10px 0">Sell [Stock Name]</td></tr>
           <tr><td style="border-bottom:1px solid rgba(255,255,255,.08);padding:10px 0"><strong>Cause</strong></td><td style="border-bottom:1px solid rgba(255,255,255,.08);padding:10px 0">Sentiment turned bearish; 5‑day MA breach</td></tr>
           <tr><td style="padding:10px 0"><strong>Protection</strong></td><td style="padding:10px 0">Prevented breach of your 10% Shield</td></tr>
         </table>
+        </div>
       </div>
     </div>
 
@@ -279,6 +281,7 @@
       <div class="card reveal" style="position:relative;overflow:hidden">
         <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--primary),var(--accent));opacity:.5"></div>
         <h3 style="margin-bottom:16px">Cost today vs Aigis</h3>
+        <div class="table-wrapper">
         <table style="width:100%;border-collapse:collapse">
           <tr>
             <th style="text-align:left;padding:12px 8px 12px 0;border-bottom:2px solid rgba(255,255,255,.1);font-weight:600">Charge Item</th>
@@ -316,6 +319,7 @@
             <td style="padding:14px 0 14px 8px"><strong style="color:var(--accent);font-size:16px">Total: ₹1,788/year + capital protected</strong></td>
           </tr>
         </table>
+        </div>
       </div>
 
       <!-- Aigis Premium Subscription -->

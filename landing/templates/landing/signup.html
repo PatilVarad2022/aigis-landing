@@ -44,15 +44,15 @@
 
           <label>Password 
             <div style="display:flex;gap:8px;align-items:center">
-              <input id="password" type="password" name="password" required style="flex:1">
-              <button type="button" id="togglePw" class="btn secondary" style="padding:6px 10px">Show</button>
+              <input id="password" type="password" name="password" required style="flex:1;min-width:0">
+              <button type="button" id="togglePw" class="btn secondary" style="padding:6px 10px;flex-shrink:0">Show</button>
             </div>
           </label>
           <small id="pwHelp">8+ chars, 1 uppercase, 1 number</small>
           <div id="pwMeter" style="height:8px;border-radius:6px;background:rgba(255,255,255,.15);overflow:hidden">
             <div id="pwBar" style="height:100%;width:0;background:linear-gradient(90deg,#ef4444,#f59e0b,#10b981)"></div>
           </div>
-          <ul id="pwChecklist" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0 0 0;padding:0;list-style:none;font-size:12px;opacity:.9">
+          <ul id="pwChecklist" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0 0 0;padding:0;list-style:none;font-size:12px;opacity:.9" class="pw-checklist">
             <li id="chkLen">• 8+ characters</li>
             <li id="chkUpper">• 1 uppercase letter</li>
             <li id="chkNum">• 1 number</li>
