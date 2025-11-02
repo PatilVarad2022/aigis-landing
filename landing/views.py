@@ -378,36 +378,31 @@ Welcome aboard!
 
 P.S. Remember: Your trial is completely free, no credit card required. If you love it after 28 days, it's just ₹149/month. If not, export your data and walk away—no questions asked.'''
 
-                # Redirect immediately after successful user creation
-                # Email sending happens in background thread (won't block response)
-                messages.success(request, "Your 28-day trial is active. Check your email.")
-                
-                # Import threading for background email sending
-                import threading
-                
-                def send_emails_in_background():
-                    """Send emails in background thread - won't block response"""
+                # Send emails synchronously but don't block on errors
+                # This ensures emails are sent before redirect
+                try:
+                    # Send welcome email to user
+                    msg = EmailMultiAlternatives(
+                        subject='Welcome to Aigis! 🛡️ Your AI Trading Partner is Ready',
+                        body=text_content,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        to=[email],
+                    )
+                    msg.attach_alternative(html_content, "text/html")
+                    msg.send(fail_silently=True)
+                    print(f"[AIGIS] ✓ Welcome email sent to {email}")
+                except Exception as e:
+                    print(f"[AIGIS] ✗ Failed to send welcome email to {email}: {e}")
+                    import traceback
+                    print(f"[AIGIS] Error details: {traceback.format_exc()}")
+
+                # Send notification email to admin
+                admin_email = getattr(settings, 'ADMIN_EMAIL', None)
+                if admin_email:
                     try:
-                        # Send welcome email
-                        msg = EmailMultiAlternatives(
-                            subject='Welcome to Aigis! 🛡️ Your AI Trading Partner is Ready',
-                            body=text_content,
-                            from_email=settings.DEFAULT_FROM_EMAIL,
-                            to=[email],
-                        )
-                        msg.attach_alternative(html_content, "text/html")
-                        msg.send(fail_silently=True)
-                        print(f"[AIGIS] ✓ Welcome email sent to {email}")
-                    except Exception as e:
-                        print(f"[AIGIS] ✗ Failed to send welcome email: {e}")
-                    
-                    # Send admin notification
-                    try:
-                        admin_email = getattr(settings, 'ADMIN_EMAIL', None)
-                        if admin_email:
-                            send_mail(
-                                subject=f'New Aigis Signup: {full_name}',
-                                message=f'''New user signed up:
+                        send_mail(
+                            subject=f'New Aigis Signup: {full_name}',
+                            message=f'''New user signed up:
 
 Name: {full_name}
 Email: {email}
@@ -416,19 +411,17 @@ Loss Shield: {shield}%
 Signup Date: {user.date_joined.strftime("%Y-%m-%d %H:%M:%S")}
 
 Total users: {User.objects.count()}''',
-                                from_email=settings.DEFAULT_FROM_EMAIL,
-                                recipient_list=[admin_email],
-                                fail_silently=True,
-                            )
-                            print(f"[AIGIS] ✓ Admin notification sent")
+                            from_email=settings.DEFAULT_FROM_EMAIL,
+                            recipient_list=[admin_email],
+                            fail_silently=True,
+                        )
+                        print(f"[AIGIS] ✓ Admin notification sent to {admin_email}")
                     except Exception as e:
                         print(f"[AIGIS] ✗ Failed to send admin notification: {e}")
-                
-                # Start email sending in background thread
-                email_thread = threading.Thread(target=send_emails_in_background)
-                email_thread.daemon = True
-                email_thread.start()
-                
+                        import traceback
+                        print(f"[AIGIS] Error details: {traceback.format_exc()}")
+
+                messages.success(request, "Your 28-day trial is active. Check your email.")
                 return redirect("signup_success")
             else:
                 # Form is invalid, render with errors
