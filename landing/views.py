@@ -130,18 +130,15 @@ def signup(request):
             if form.is_valid():
                 user = None
                 try:
-                    # Test database connection first (wakes up Neon if sleeping)
-                    from django.db import connection
-                    connection.ensure_connection()
-                    
-                    with transaction.atomic():
-                        email = form.cleaned_data["email"].lower()
-                        password = form.cleaned_data["password"]
-                        full_name = form.cleaned_data["full_name"]
-                        phone = form.cleaned_data["phone"]
-                        shield = form.cleaned_data["shield_limit_percent"]
+                    email = form.cleaned_data["email"].lower()
+                    password = form.cleaned_data["password"]
+                    full_name = form.cleaned_data["full_name"]
+                    phone = form.cleaned_data["phone"]
+                    shield = form.cleaned_data["shield_limit_percent"]
 
-                        # Check if user already exists (double-check)
+                    # Use transaction with timeout handling
+                    with transaction.atomic():
+                        # Check if user already exists (this will wake up Neon if sleeping)
                         if User.objects.filter(username=email).exists() or User.objects.filter(email=email).exists():
                             form.add_error('email', 'An account with this email already exists. Please use a different email or try logging in.')
                             return render(request, "landing/signup.html", {"form": form})
@@ -163,9 +160,8 @@ def signup(request):
                     form.add_error(None, 'Failed to create account. Please try again.')
                     return render(request, "landing/signup.html", {"form": form})
 
-                # Send welcome email to user (HTML formatted) - non-blocking
-                try:
-                    html_content = f'''
+                # Prepare email content (will be sent in background thread)
+                html_content = f'''
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -343,8 +339,8 @@ def signup(request):
 </html>
 '''
                 
-                    # Plain text version for email clients that don't support HTML
-                    text_content = f'''Hi {full_name},
+                # Plain text version for email clients that don't support HTML
+                text_content = f'''Hi {full_name},
 
 Welcome to Aigis! We're thrilled to have you join us. You've just taken the first step toward trading with discipline, protection, and AI-powered accountability.
 
@@ -381,30 +377,37 @@ Welcome aboard!
 — The Aigis Team
 
 P.S. Remember: Your trial is completely free, no credit card required. If you love it after 28 days, it's just ₹149/month. If not, export your data and walk away—no questions asked.'''
-                
-                    # Send HTML email
-                    msg = EmailMultiAlternatives(
-                        subject='Welcome to Aigis! 🛡️ Your AI Trading Partner is Ready',
-                        body=text_content,
-                        from_email=settings.DEFAULT_FROM_EMAIL,
-                        to=[email],
-                    )
-                    msg.attach_alternative(html_content, "text/html")
-                    msg.send(fail_silently=True)  # Changed to fail_silently=True to prevent blocking
-                    print(f"[AIGIS] ✓ Welcome email sent successfully to {email}")
-                except Exception as e:
-                    print(f"[AIGIS] ✗ Failed to send welcome email to {email}: {e}")
-                    import traceback
-                    print(f"[AIGIS] Error details: {traceback.format_exc()}")
-                    # Still continue even if email fails - don't block signup
 
-                # Send notification email to admin
-                admin_email = getattr(settings, 'ADMIN_EMAIL', None)
-                if admin_email:
+                # Redirect immediately after successful user creation
+                # Email sending happens in background thread (won't block response)
+                messages.success(request, "Your 28-day trial is active. Check your email.")
+                
+                # Import threading for background email sending
+                import threading
+                
+                def send_emails_in_background():
+                    """Send emails in background thread - won't block response"""
                     try:
-                        send_mail(
-                            subject=f'New Aigis Signup: {full_name}',
-                            message=f'''New user signed up:
+                        # Send welcome email
+                        msg = EmailMultiAlternatives(
+                            subject='Welcome to Aigis! 🛡️ Your AI Trading Partner is Ready',
+                            body=text_content,
+                            from_email=settings.DEFAULT_FROM_EMAIL,
+                            to=[email],
+                        )
+                        msg.attach_alternative(html_content, "text/html")
+                        msg.send(fail_silently=True)
+                        print(f"[AIGIS] ✓ Welcome email sent to {email}")
+                    except Exception as e:
+                        print(f"[AIGIS] ✗ Failed to send welcome email: {e}")
+                    
+                    # Send admin notification
+                    try:
+                        admin_email = getattr(settings, 'ADMIN_EMAIL', None)
+                        if admin_email:
+                            send_mail(
+                                subject=f'New Aigis Signup: {full_name}',
+                                message=f'''New user signed up:
 
 Name: {full_name}
 Email: {email}
@@ -413,17 +416,19 @@ Loss Shield: {shield}%
 Signup Date: {user.date_joined.strftime("%Y-%m-%d %H:%M:%S")}
 
 Total users: {User.objects.count()}''',
-                        from_email=settings.DEFAULT_FROM_EMAIL,
-                        recipient_list=[admin_email],
-                        fail_silently=True,  # Changed to fail_silently=True to prevent blocking
-                        )
-                        print(f"[AIGIS] ✓ Admin notification sent successfully to {admin_email}")
+                                from_email=settings.DEFAULT_FROM_EMAIL,
+                                recipient_list=[admin_email],
+                                fail_silently=True,
+                            )
+                            print(f"[AIGIS] ✓ Admin notification sent")
                     except Exception as e:
                         print(f"[AIGIS] ✗ Failed to send admin notification: {e}")
-                        import traceback
-                        print(f"[AIGIS] Admin notification error details: {traceback.format_exc()}")
-
-                messages.success(request, "Your 28-day trial is active. Check your email.")
+                
+                # Start email sending in background thread
+                email_thread = threading.Thread(target=send_emails_in_background)
+                email_thread.daemon = True
+                email_thread.start()
+                
                 return redirect("signup_success")
             else:
                 # Form is invalid, render with errors
