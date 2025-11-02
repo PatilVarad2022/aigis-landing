@@ -124,9 +124,10 @@ def index(request):
 
 
 def signup(request):
-    if request.method == "POST":
-        form = SignupForm(request.POST)
-        if form.is_valid():
+    try:
+        if request.method == "POST":
+            form = SignupForm(request.POST)
+            if form.is_valid():
             with transaction.atomic():
                 email = form.cleaned_data["email"].lower()
                 password = form.cleaned_data["password"]
@@ -399,9 +400,23 @@ Total users: {User.objects.count()}''',
 
             messages.success(request, "Your 28-day trial is active. Check your email.")
             return redirect("signup_success")
+        else:
+            # Form is invalid, render with errors
+            return render(request, "landing/signup.html", {"form": form})
     else:
         form = SignupForm()
     return render(request, "landing/signup.html", {"form": form})
+    except Exception as e:
+        # Log the error for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in signup view: {e}", exc_info=True)
+        # Return a basic error page instead of crashing
+        from django.http import HttpResponseServerError
+        return HttpResponseServerError(
+            f"<h1>Server Error</h1><p>We're experiencing technical difficulties. Please try again later.</p>"
+            f"<p>Error: {str(e)}</p>"
+        )
 
 
 def signup_success(request):

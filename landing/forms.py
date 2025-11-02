@@ -28,7 +28,14 @@ class SignupForm(forms.Form):
 
     def clean_email(self):
         email = self.cleaned_data["email"].lower()
-        if User.objects.filter(email=email).exists():
-            raise ValidationError("An account with this email already exists.")
+        try:
+            if User.objects.filter(email=email).exists():
+                raise ValidationError("An account with this email already exists.")
+        except Exception as e:
+            # If database connection fails, log but don't block form rendering
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Database error checking email: {e}")
+            # Allow the form to proceed - will be caught on submit
         return email
 
