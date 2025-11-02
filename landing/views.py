@@ -130,6 +130,10 @@ def signup(request):
             if form.is_valid():
                 user = None
                 try:
+                    # Test database connection first (wakes up Neon if sleeping)
+                    from django.db import connection
+                    connection.ensure_connection()
+                    
                     with transaction.atomic():
                         email = form.cleaned_data["email"].lower()
                         password = form.cleaned_data["password"]
@@ -430,14 +434,22 @@ Total users: {User.objects.count()}''',
     except Exception as e:
         # Log the error for debugging
         import logging
+        import traceback
         logger = logging.getLogger(__name__)
         logger.error(f"Error in signup view: {e}", exc_info=True)
-        # Return a basic error page instead of crashing
-        from django.http import HttpResponseServerError
-        return HttpResponseServerError(
-            f"<h1>Server Error</h1><p>We're experiencing technical difficulties. Please try again later.</p>"
-            f"<p>Error: {str(e)}</p>"
-        )
+        
+        # Check if it's a database connection error
+        error_msg = str(e).lower()
+        if 'connection' in error_msg or 'timeout' in error_msg or 'operationalerror' in error_msg:
+            # Database connection issue - return user-friendly error page
+            messages.error(request, "Database connection timeout. Please try again in a few seconds.")
+            form = SignupForm()
+            return render(request, "landing/signup.html", {"form": form})
+        
+        # For other errors, return error page without 500 status (to prevent 502)
+        messages.error(request, "An error occurred during signup. Please try again or contact support.")
+        form = SignupForm()
+        return render(request, "landing/signup.html", {"form": form})
 
 
 def signup_success(request):

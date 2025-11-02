@@ -90,6 +90,8 @@ if os.environ.get('DATABASE_URL'):
     db_config['ENGINE'] = 'django.db.backends.postgresql'
     # Add SSL requirement for Neon
     db_config.setdefault('OPTIONS', {})['sslmode'] = 'require'
+    # Add connection timeout settings for Neon (to handle suspended computes)
+    db_config.setdefault('OPTIONS', {})['connect_timeout'] = '10'  # 10 seconds timeout
     DATABASES = {
         'default': db_config
     }
