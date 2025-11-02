@@ -129,14 +129,14 @@ def signup(request):
             form = SignupForm(request.POST)
             if form.is_valid():
                 with transaction.atomic():
-                email = form.cleaned_data["email"].lower()
-                password = form.cleaned_data["password"]
-                full_name = form.cleaned_data["full_name"]
-                phone = form.cleaned_data["phone"]
-                shield = form.cleaned_data["shield_limit_percent"]
+                    email = form.cleaned_data["email"].lower()
+                    password = form.cleaned_data["password"]
+                    full_name = form.cleaned_data["full_name"]
+                    phone = form.cleaned_data["phone"]
+                    shield = form.cleaned_data["shield_limit_percent"]
 
-                user = User.objects.create_user(username=email, email=email, password=password)
-                UserProfile.objects.create(user=user, full_name=full_name, phone=phone, shield_limit_percent=shield)
+                    user = User.objects.create_user(username=email, email=email, password=password)
+                    UserProfile.objects.create(user=user, full_name=full_name, phone=phone, shield_limit_percent=shield)
 
             # Send welcome email to user (HTML formatted)
             try:
