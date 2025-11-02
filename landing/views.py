@@ -128,7 +128,7 @@ def signup(request):
         if request.method == "POST":
             form = SignupForm(request.POST)
             if form.is_valid():
-            with transaction.atomic():
+                with transaction.atomic():
                 email = form.cleaned_data["email"].lower()
                 password = form.cleaned_data["password"]
                 full_name = form.cleaned_data["full_name"]
