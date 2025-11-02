@@ -21,11 +21,12 @@ admin.site.unregister(User)
 
 # Custom User Admin with UserProfile inline
 class CustomUserAdmin(BaseUserAdmin):
-    list_display = ('username', 'email', 'full_name', 'phone', 'shield_percent', 'date_joined', 'is_staff', 'is_active')
+    list_display = ('username', 'email', 'has_profile', 'full_name', 'phone', 'shield_percent', 'date_joined', 'is_staff', 'is_active')
     list_filter = ('is_staff', 'is_superuser', 'is_active', 'date_joined')
     search_fields = ('username', 'email', 'profile__full_name', 'profile__phone')
     ordering = ('-date_joined',)
     inlines = (UserProfileInline,)
+    list_per_page = 100  # Show more users per page
     
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
@@ -43,10 +44,17 @@ class CustomUserAdmin(BaseUserAdmin):
         }),
     )
     
+    def has_profile(self, obj):
+        if hasattr(obj, 'profile'):
+            return format_html('<span style="color: #00FF8C;">✓ Yes</span>')
+        return format_html('<span style="color: #fca5a5;">✗ No</span>')
+    has_profile.short_description = 'Has Profile'
+    has_profile.boolean = True
+    
     def full_name(self, obj):
         if hasattr(obj, 'profile'):
             return obj.profile.full_name
-        return '-'
+        return format_html('<span style="color: #94a3b8; font-style: italic;">No profile</span>')
     full_name.short_description = 'Full Name'
     full_name.admin_order_field = 'profile__full_name'
     
@@ -65,7 +73,23 @@ class CustomUserAdmin(BaseUserAdmin):
     shield_percent.admin_order_field = 'profile__shield_limit_percent'
     
     # Bulk actions for User admin
-    actions = ['delete_all_users_action']
+    actions = ['delete_all_users_action', 'create_missing_profiles']
+    
+    def create_missing_profiles(self, request, queryset):
+        """Create UserProfile for users who don't have one"""
+        created = 0
+        for user in queryset:
+            if not hasattr(user, 'profile'):
+                UserProfile.objects.create(
+                    user=user,
+                    full_name=user.email.split('@')[0],  # Use email prefix as default name
+                    phone='',
+                    shield_limit_percent=10
+                )
+                created += 1
+        
+        self.message_user(request, f"Created {created} profile(s) for users without profiles.")
+    create_missing_profiles.short_description = "Create profiles for selected users (if missing)"
     
     def delete_all_users_action(self, request, queryset):
         """Delete ALL users and profiles - USE WITH CAUTION!"""
@@ -146,6 +170,18 @@ class UserProfileAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('user')
+    
+    def changelist_view(self, request, extra_context=None):
+        """Add total count to admin interface"""
+        response = super().changelist_view(request, extra_context)
+        try:
+            qs = response.context_data['cl'].queryset
+            total_users = qs.count()
+            users_with_profiles = UserProfile.objects.count()
+            response.context_data['summary_line'] = f"Total: {total_users} users | With profiles: {users_with_profiles}"
+        except:
+            pass
+        return response
     
     # Bulk actions
     actions = ['export_selected_profiles', 'delete_selected', 'delete_all_users']
