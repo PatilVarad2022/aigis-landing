@@ -82,7 +82,24 @@ class CustomUserAdmin(BaseUserAdmin):
     # Removed admin_order_field to prevent errors
     
     # Bulk actions for User admin
-    actions = ['delete_all_users_action', 'create_missing_profiles']
+    actions = ['delete_all_users_action', 'create_missing_profiles', 'delete_orphaned_users']
+    
+    def delete_orphaned_users(self, request, queryset):
+        """Delete users who don't have profiles (orphaned users)"""
+        from django.contrib.auth.models import User
+        
+        # Find users without profiles (excluding superusers)
+        orphaned_users = User.objects.filter(is_superuser=False).exclude(
+            id__in=UserProfile.objects.values_list('user_id', flat=True)
+        )
+        
+        count = orphaned_users.count()
+        if count > 0:
+            orphaned_users.delete()
+            self.message_user(request, f"Deleted {count} orphaned user(s) without profiles.")
+        else:
+            self.message_user(request, "No orphaned users found (all users have profiles or are superusers).")
+    delete_orphaned_users.short_description = "Delete orphaned users (users without profiles)"
     
     def create_missing_profiles(self, request, queryset):
         """Create UserProfile for users who don't have one"""
