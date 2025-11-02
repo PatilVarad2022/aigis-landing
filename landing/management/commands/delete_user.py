@@ -39,13 +39,16 @@ class Command(BaseCommand):
                 self.stdout.write(f'  python manage.py delete_user {email} --confirm')
                 return
             
-            # Delete profile first (if exists)
+            # Delete profile first (if exists) - must be done before deleting user
             if profile:
                 profile.delete()
-                self.stdout.write(f'Deleted UserProfile for {email}')
+                self.stdout.write(f'✓ Deleted UserProfile for {email}')
+            else:
+                self.stdout.write(f'  No UserProfile found for {email}')
             
-            # Delete user
+            # Delete user (now safe - profile is gone)
             username = user.username
+            is_superuser = user.is_superuser
             user.delete()
             
             self.stdout.write(self.style.SUCCESS(
