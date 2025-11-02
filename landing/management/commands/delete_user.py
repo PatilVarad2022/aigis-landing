@@ -39,14 +39,29 @@ class Command(BaseCommand):
                 self.stdout.write(f'  python manage.py delete_user {email} --confirm')
                 return
             
-            # Delete profile first (if exists) - must be done before deleting user
+            # Delete related data first to avoid foreign key constraints
+            # Django will handle cascading deletes, but we need to clear related objects
+            
+            # Delete profile first (if exists)
             if profile:
                 profile.delete()
                 self.stdout.write(f'✓ Deleted UserProfile for {email}')
             else:
                 self.stdout.write(f'  No UserProfile found for {email}')
             
-            # Delete user (now safe - profile is gone)
+            # Clear user sessions (django.contrib.sessions)
+            try:
+                from django.contrib.sessions.models import Session
+                Session.objects.filter(expire_date__gte=user.date_joined).delete()
+                self.stdout.write(f'  Cleared user sessions')
+            except:
+                pass  # Sessions might not exist or already cleared
+            
+            # Clear user permissions and groups associations
+            user.user_permissions.clear()
+            user.groups.clear()
+            
+            # Delete user (should work now with all relations cleared)
             username = user.username
             is_superuser = user.is_superuser
             user.delete()
