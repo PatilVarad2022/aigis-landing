@@ -24,5 +24,5 @@ else:
 EOF
 
 # Start Gunicorn
-exec gunicorn mysite.wsgi
+exec gunicorn mysite.wsgi --bind 0.0.0.0:${PORT:-10000}
 
